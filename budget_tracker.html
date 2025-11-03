@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Budget Tracker</title>
+  <style>
+    :root{
+      --bg:#0f1221;         /* deep blue-gray */
+      --panel:#141832;      /* card background */
+      --ink:#e8eaf6;        /* primary text */
+      --muted:#aab1d6;      /* secondary text */
+      --brand:#7c5cff;      /* accent */
+      --ok:#22c55e;         /* green */
+      --warn:#f59e0b;       /* amber */
+      --bad:#ef4444;        /* red */
+      --chip:#1b2042;       /* chip bg */
+      --ring: 0 0 0 3px rgba(124,92,255,.25);
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+
+    *{ box-sizing: border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--ink); background: radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.25), transparent 60%), var(--bg);
+    }
+
+    .wrap{ max-width:1100px; margin-inline:auto; padding:28px; }
+
+    header{
+      display:flex; gap:16px; align-items:center; justify-content:space-between; margin-block:8px 22px;
+    }
+    .title{
+      display:flex; gap:14px; align-items:center;
+    }
+    .logo{
+      width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--brand),#4bc0ff); box-shadow: var(--shadow);
+      display:grid; place-items:center; color:white; font-weight:800; letter-spacing:.5px;
+    }
+    .title h1{ margin:0; font-size: clamp(18px, 2.4vw, 28px) }
+    .subtitle{ color:var(--muted); margin-top:2px; font-size:12px }
+
+    .controls{ display:flex; gap:10px; flex-wrap:wrap }
+    button, .btn{
+      background: var(--brand); color:white; border:0; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600; box-shadow: var(--shadow);
+    }
+    button.secondary{
+      background: transparent; color: var(--ink); border:1px solid #293066; box-shadow:none;
+    }
+    button:focus-visible{ outline: none; box-shadow: var(--ring) }
+
+    .grid{
+      display:grid; grid-template-columns: repeat(12,1fr); gap:16px;
+    }
+    .card{
+      background: var(--panel); border:1px solid #1f254d; border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .card .hd{ padding:14px 16px; border-bottom:1px dashed #2a2f63; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:12px }
+    .card .bd{ padding:16px }
+
+    /* Summary cards */
+    .kpi{ display:flex; align-items:center; gap:12px }
+    .kpi .pill{
+      width:38px; height:38px; border-radius:12px; background:var(--chip); display:grid; place-items:center; font-weight:700;
+    }
+    .kpi h3{ margin:0; font-size:14px; color:var(--muted) }
+    .kpi p{ margin:2px 0 0; font-size:20px; font-weight:800 }
+
+    /* Category bars */
+    .row{ display:flex; align-items:center; gap:14px; margin:10px 0 }
+    .row label{ flex:0 0 120px; color:var(--muted) }
+    .bar{ flex:1; height:10px; background:#1b2042; border-radius:999px; position:relative; overflow:hidden }
+    .bar > i{ position:absolute; inset:0; width:0%; background:linear-gradient(90deg,var(--ok),var(--brand)); }
+    .row .amt{ flex:0 0 160px; text-align:right; color:var(--ink); font-weight:700 }
+
+    /* Table */
+    table{ width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border-radius:var(--radius); }
+    thead th{ text-align:left; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; background:#171c3a; padding:12px 14px; position:sticky; top:0; z-index:1 }
+    tbody td{ padding:12px 14px; border-top:1px solid #22285a }
+    tbody tr:hover{ background: #161b39 }
+    tfoot td{ padding:14px; background:#14193a; border-top:1px solid #293066; font-weight:800 }
+
+    input[type="text"],input[type="number"],select,input[type="date"]{
+      width:100%; background:#0f1433; color:var(--ink); border:1px solid #293066; border-radius:10px; padding:10px 12px;
+    }
+    input[type="number"]{ -moz-appearance: textfield }
+    input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+
+    .chips{ display:flex; gap:8px; flex-wrap:wrap }
+    .chip{ padding:8px 10px; background:var(--chip); border:1px solid #242b5a; border-radius:999px; color:var(--muted); font-size:12px }
+
+    .note{ color:var(--muted); font-size:12px }
+
+    .footer{ color:var(--muted); text-align:center; margin:28px 0 10px }
+
+    /* Responsive */
+    @media (max-width: 780px){
+      .grid{ grid-template-columns: repeat(6,1fr) }
+      .row label{ flex: 0 0 90px }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <div class="logo">₹</div>
+        <div>
+          <h1>Budget Tracker</h1>
+          <div class="subtitle">Fast, simple monthly budgeting — saved locally in your browser.</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="addRowBtn" title="Add a new expense">+ Add expense</button>
+        <button class="secondary" id="exportBtn" title="Download a JSON backup">Export</button>
+        <button class="secondary" id="importBtn" title="Load a JSON backup">Import</button>
+        <button class="secondary" id="resetBtn" title="Clear everything">Reset</button>
+        <a class="btn" href="/analytics.html" title="View analytics">Analytics →</a>
+      </div>
+    </header>
+
+    <section class="grid" style="margin-bottom:16px">
+      <div class="card" style="grid-column: span 3;">
+        <div class="bd">
+          <div class="kpi">
+            <div class="pill">₹</div>
+            <div>
+              <h3>Planned Income</h3>
+              <p id="plannedIncome">0</p>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <input id="incomeInput" type="number" min="0" step="1" placeholder="Enter monthly income" />
+          </div>
+          <div class="note" style="margin-top:8px">Tip: set your monthly take‑home income.</div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 3;">
+        <div class="bd">
+          <div class="kpi">
+            <div class="pill">↘</div>
+            <div>
+              <h3>Total Spent</h3>
+              <p id="totalSpent">0</p>
+            </div>
+          </div>
+          <div class="chips" style="margin-top:10px">
+            <span class="chip">This month</span>
+            <span class="chip" id="txnCount">0 transactions</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 3;">
+        <div class="bd">
+          <div class="kpi">
+            <div class="pill">≈</div>
+            <div>
+              <h3>Remaining</h3>
+              <p id="remaining">0</p>
+            </div>
+          </div>
+          <div class="note" style="margin-top:8px">Income − Spent</div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 3;">
+        <div class="bd">
+          <div class="kpi">
+            <div class="pill">%</div>
+            <div>
+              <h3>Savings Rate</h3>
+              <p id="saveRate">0%</p>
+            </div>
+          </div>
+          <div class="note" style="margin-top:8px">(Income − Spent) ÷ Income</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd">Category Budgets</div>
+      <div class="bd" id="categoryBars">
+        <!-- Bars rendered here -->
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <div class="hd">Expenses</div>
+      <div class="bd" style="padding:0">
+        <table id="table">
+          <thead>
+            <tr>
+              <th style="width:120px">Date</th>
+              <th>Description</th>
+              <th style="width:180px">Category</th>
+              <th style="width:140px">Amount (₹)</th>
+              <th style="width:60px">—</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">Total</td>
+              <td id="tfootTotal">0</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <p class="footer">Made with ❤️ — data is stored only in your browser (LocalStorage).</p>
+  </div>
+
+  <script>
+    // ---- Budget tracker with backend sync (falls back to localStorage). ----
+
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    const STORAGE_KEY = 'budget-tracker-v2';
+    const USERNAME_KEY = 'budget-username';
+    const API_BASE = '';
+    let userId = null;
+
+    function getUsername(){
+      let u = localStorage.getItem(USERNAME_KEY);
+      if(!u){ u = 'me'; localStorage.setItem(USERNAME_KEY, u); }
+      return u;
+    }
+
+    async function apiFetch(path, opts={}){
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { 'Content-Type':'application/json' },
+        ...opts,
+        body: opts.body && typeof opts.body !== 'string' ? JSON.stringify(opts.body) : opts.body
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = res.headers.get('content-type')||'';
+      return ct.includes('application/json') ? res.json() : res.text();
+    }
+
+    const defaultState = {
+      income: 0,
+      categories: [
+        { key:'Food', budget: 8000 },
+        { key:'Transport', budget: 3000 },
+        { key:'Rent', budget: 12000 },
+        { key:'Shopping', budget: 4000 },
+        { key:'Entertainment', budget: 2500 },
+        { key:'Utilities', budget: 3500 },
+        { key:'Other', budget: 2000 }
+      ],
+      txns: [
+        // {date:'2025-08-01', desc:'Example', cat:'Food', amt:250}
+      ]
+    };
+
+    let state = load();
+
+    // Elements
+    const incomeInput = $('#incomeInput');
+    const plannedIncomeEl = $('#plannedIncome');
+    const totalSpentEl = $('#totalSpent');
+    const remainingEl = $('#remaining');
+    const saveRateEl = $('#saveRate');
+    const txnCountEl = $('#txnCount');
+    const tbody = $('#tbody');
+    const tfootTotal = $('#tfootTotal');
+    const categoryBars = $('#categoryBars');
+
+    $('#addRowBtn').addEventListener('click', () => addTxnRow());
+    $('#resetBtn').addEventListener('click', async () => {
+      if(!userId){ return; }
+      if(confirm('Clear all budget data on server?')){
+        try{ await apiFetch(`/api/user/${userId}/reset`, { method:'DELETE' }); }
+        catch(e){ console.warn('Reset failed:', e.message); }
+        await loadFromBackend();
+      }
+    });
+    $('#exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `budget-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click(); URL.revokeObjectURL(url);
+    });
+    $('#importBtn').addEventListener('click', () => {
+      const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/json';
+      i.onchange = () => {
+        const file = i.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = () => { try { state = JSON.parse(reader.result); save(); renderAll(); } catch(e){ alert('Invalid JSON'); } };
+        reader.readAsText(file);
+      };
+      i.click();
+    });
+
+    incomeInput.addEventListener('input', async () => {
+      state.income = Number(incomeInput.value || 0);
+      save();
+      updateSummary();
+      if(userId){
+        try{ await apiFetch(`/api/user/${userId}/income`, { method:'PUT', body:{ income: state.income } }); }
+        catch(e){ console.warn('Income update failed:', e.message); }
+      }
+    });
+
+    function load(){
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(JSON.stringify(defaultState)); }
+      catch(e){ return JSON.parse(JSON.stringify(defaultState)); }
+    }
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+    function formatINR(n){
+      return Number(n || 0).toLocaleString('en-IN',{ maximumFractionDigits:0 });
+    }
+
+    function renderAll(){
+      // Inputs
+      incomeInput.value = state.income || '';
+      plannedIncomeEl.textContent = formatINR(state.income);
+
+      // Table rows
+      tbody.innerHTML = '';
+      state.txns.forEach((t, idx) => tbody.appendChild(renderRow(t, idx)));
+
+      // Categories
+      renderCategoryBars();
+
+      // Summary
+      updateSummary();
+    }
+
+    function renderRow(t, idx){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="date" value="${t.date || ''}"></td>
+        <td><input type="text" placeholder="Description" value="${escapeHtml(t.desc || '')}"></td>
+        <td>${categorySelect(t.cat || '')}</td>
+        <td><input type="number" min="0" step="1" value="${Number(t.amt||0)}"></td>
+        <td><button class="secondary" title="Delete">✕</button></td>
+      `;
+      const [dateI, descI, sel, amtI, delB] = $$('input,select,button', tr);
+
+      const pushUpdate = async () => {
+        if(!t.id){ return; }
+        try{
+          await apiFetch(`/api/transaction/${t.id}`, { method:'PUT', body:{
+            date: t.date, description: t.desc||'', category: t.cat||'', amount: Number(t.amt)||0
+          }});
+        }catch(e){ console.warn('Update txn failed:', e.message); }
+      };
+
+      dateI.addEventListener('change', async () => { t.date = dateI.value; persistAndRefresh(); await pushUpdate(); });
+      descI.addEventListener('input', async () => { t.desc = descI.value; persistAndRefresh(false); await pushUpdate(); });
+      sel.addEventListener('change', async () => { t.cat = sel.value; persistAndRefresh(); await pushUpdate(); });
+      amtI.addEventListener('input', async () => { t.amt = Number(amtI.value||0); persistAndRefresh(); await pushUpdate(); });
+      delB.addEventListener('click', async () => {
+        const removed = state.txns.splice(idx,1)[0];
+        persistAndRefresh();
+        if(removed?.id){
+          try{ await apiFetch(`/api/transaction/${removed.id}`, { method:'DELETE' }); }
+          catch(e){ console.warn('Delete txn failed:', e.message); }
+        }
+      });
+
+      return tr;
+    }
+
+    function persistAndRefresh(skipBars=false){ save(); updateSummary(); if(!skipBars) renderCategoryBars(); }
+
+    function categorySelect(val){
+      const opts = state.categories.map(c => `<option ${c.key===val?'selected':''}>${c.key}</option>`).join('');
+      return `<select>${opts}</select>`;
+    }
+
+    async function addTxnRow(){
+      const now = new Date();
+      const d = now.toISOString().slice(0,10);
+      const firstCat = state.categories[0]?.key || 'Other';
+      const txn = { date:d, desc:'', cat:firstCat, amt:0 };
+      state.txns.unshift(txn); save();
+      tbody.insertBefore(renderRow(txn, 0), tbody.firstChild);
+      updateSummary();
+      if(userId){
+        try{
+          const created = await apiFetch(`/api/user/${userId}/transactions`, {
+            method:'POST', body:{ date:d, description:'', category:firstCat, amount:0 }
+          });
+          txn.id = created.id; // keep id for later updates
+        }catch(e){ console.warn('Create txn failed:', e.message); }
+      }
+    }
+
+    function updateSummary(){
+      const spent = state.txns.reduce((s,t)=> s + (Number(t.amt)||0), 0);
+      totalSpentEl.textContent = formatINR(spent);
+      tfootTotal.textContent = formatINR(spent);
+      txnCountEl.textContent = `${state.txns.length} transaction${state.txns.length!==1?'s':''}`;
+
+      const remaining = Math.max(0, (Number(state.income)||0) - spent);
+      remainingEl.textContent = formatINR(remaining);
+
+      const rate = (state.income>0) ? Math.round( (remaining/state.income)*100 ) : 0;
+      saveRateEl.textContent = `${rate}%`;
+    }
+
+    function renderCategoryBars(){
+      // Compute spend per category
+      const map = Object.fromEntries(state.categories.map(c => [c.key,0]));
+      for(const t of state.txns){ if(map.hasOwnProperty(t.cat)) map[t.cat] += Number(t.amt)||0; }
+
+      categoryBars.innerHTML = '';
+      state.categories.forEach((c, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const used = map[c.key] || 0;
+        const pct = c.budget ? Math.min(100, Math.round((used/c.budget)*100)) : 0;
+        const status = used > c.budget ? 'var(--bad)' : pct > 80 ? 'var(--warn)' : 'var(--ok)';
+        row.innerHTML = `
+          <label>${c.key}</label>
+          <div class="bar"><i style="width:${pct}%; background:${status}"></i></div>
+          <div class="amt">₹${formatINR(used)} / <span contenteditable data-idx="${i}" data-id="${c.id||''}" class="catBudget">₹${formatINR(c.budget)}</span></div>
+        `;
+        categoryBars.appendChild(row);
+      });
+
+      // Inline editing of category budgets (contenteditable span)
+      $$('.catBudget', categoryBars).forEach(sp => {
+        sp.addEventListener('blur', async () => {
+          const i = Number(sp.getAttribute('data-idx'));
+          const num = parseInt(sp.textContent.replace(/[^\d]/g,'')) || 0;
+          state.categories[i].budget = num; save();
+          const cid = sp.getAttribute('data-id');
+          if(cid){
+            try{ await apiFetch(`/api/category/${cid}`, { method:'PUT', body:{ budget:num } }); }
+            catch(e){ console.warn('Update category failed:', e.message); }
+          }
+          renderCategoryBars();
+        });
+      });
+    }
+
+    function escapeHtml(str){
+      return str.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    async function ensureUser(){
+      const username = getUsername();
+      const user = await apiFetch('/api/user', { method:'POST', body:{ username } });
+      userId = user.id;
+      state.income = Number(user.income || 0);
+      save();
+      return userId;
+    }
+
+    async function loadFromBackend(){
+      try{
+        if(!userId){ await ensureUser(); }
+        const [cats, txns] = await Promise.all([
+          apiFetch(`/api/user/${userId}/categories`),
+          apiFetch(`/api/user/${userId}/transactions`)
+        ]);
+        state.categories = cats.map(c => ({ id:c.id, key:c.name, budget:Number(c.budget)||0 }));
+        state.txns = txns.map(t => ({ id:t.id, date:t.date, desc:t.description||'', cat:t.category||'', amt:Number(t.amount)||0 }));
+        save();
+        renderAll();
+      }catch(e){
+        console.warn('Backend load failed, using local data:', e.message);
+        renderAll();
+      }
+    }
+
+    // Initialize
+    loadFromBackend();
+
+    // Optional: ping backend to verify connectivity (shows in console)
+    fetch('/api/health', { method: 'GET' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(j => console.log('Backend health:', j))
+      .catch(err => console.warn('Backend not reachable:', err.message));
+  </script>
+</body>
+</html>

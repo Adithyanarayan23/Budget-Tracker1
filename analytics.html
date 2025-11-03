@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Budget Analytics</title>
+  <style>
+    :root{ --bg:#0f1221; --panel:#141832; --ink:#e8eaf6; --muted:#aab1d6; --brand:#7c5cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --chip:#1b2042; --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.35); }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{ margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial; color:var(--ink); background: radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.25), transparent 60%), var(--bg); }
+    .wrap{ max-width:1100px; margin-inline:auto; padding:28px }
+    header{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-block:8px 22px }
+    .title{ display:flex; align-items:center; gap:14px }
+    .logo{ width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--brand),#4bc0ff); box-shadow:var(--shadow); display:grid; place-items:center; color:#fff; font-weight:800 }
+    .subtitle{ color:var(--muted); font-size:12px }
+    .controls{ display:flex; gap:10px; flex-wrap:wrap }
+    a.btn, button.btn{ background:var(--brand); color:#fff; text-decoration:none; border:0; padding:10px 14px; border-radius:12px; font-weight:600; box-shadow:var(--shadow); cursor:pointer }
+    .card{ background:var(--panel); border:1px solid #1f254d; border-radius:var(--radius); box-shadow:var(--shadow) }
+    .card .hd{ padding:14px 16px; border-bottom:1px dashed #2a2f63; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:12px }
+    .card .bd{ padding:16px }
+    .grid{ display:grid; grid-template-columns: repeat(12,1fr); gap:16px }
+    .chart{ height:260px }
+    .bars{ 
+      display:grid; grid-template-columns: repeat(7, 1fr); align-items:end; justify-items:center; gap:16px; 
+      height:220px; padding:18px 18px 10px; background:linear-gradient(180deg, rgba(41,48,102,.25), transparent 18px) , #0f1433; 
+      border:1px solid #293066; border-radius:12px
+    }
+    .bar{ width:70%; max-width:46px; background:linear-gradient(0deg,var(--brand),#4bc0ff); border-radius:8px 8px 0 0; position:relative; min-height:6px; box-shadow: 0 6px 14px rgba(76,96,255,.18) }
+    .bar small{ position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--ink); opacity:.9 }
+    .bar label{ display:block; text-align:center; font-size:11px; margin-top:8px; color:var(--muted) }
+    .row{ display:flex; gap:16px; align-items:center; margin:8px 0 }
+    .pill{ padding:6px 10px; border-radius:999px; background:var(--chip); border:1px solid #242b5a; color:var(--muted); font-size:12px }
+    table{ width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border-radius:var(--radius) }
+    thead th{ text-align:left; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; background:#171c3a; padding:12px 14px }
+    tbody td{ padding:12px 14px; border-top:1px solid #22285a }
+    @media(max-width:780px){ .grid{ grid-template-columns: repeat(6,1fr) } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <div class="logo">₹</div>
+        <div>
+          <h1 style="margin:0; font-size: clamp(18px, 2.4vw, 28px)">Analytics</h1>
+          <div class="subtitle">This week's category breakdown</div>
+        </div>
+      </div>
+      <div class="controls">
+        <a class="btn" href="/budget_tracker.html">← Back to Tracker</a>
+      </div>
+    </header>
+
+    <section class="grid" style="margin-bottom:16px">
+      <div class="card" style="grid-column: span 12;">
+        <div class="hd">This Week — Daily Spending</div>
+        <div class="bd">
+          <div id="weeklyBars" class="bars"></div>
+          <div id="weeklyEmpty" class="subtitle" style="margin-top:8px; display:none">No transactions this week yet. Add some in the tracker.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card" style="grid-column: span 12;">
+        <div class="hd">Spend by Category (this week)</div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr><th>Category</th><th>Budget (₹/week)</th><th>Spent (₹)</th><th>Usage</th></tr>
+            </thead>
+            <tbody id="catTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" style="margin-top:16px">
+      <div class="card" style="grid-column: span 12;">
+        <div class="hd">Recent Transactions (this week)</div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr><th style="width:120px">Date</th><th>Description</th><th style="width:180px">Category</th><th style="width:140px">Amount (₹)</th></tr>
+            </thead>
+            <tbody id="txTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const API_BASE = (location.port === '3000') ? '' : 'http://localhost:3000';
+    const USERNAME_KEY = 'budget-username';
+
+    function getUsername(){
+      let u = localStorage.getItem(USERNAME_KEY);
+      if(!u){ u = 'me'; localStorage.setItem(USERNAME_KEY, u); }
+      return u;
+    }
+
+    async function apiFetch(path, opts={}){
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { 'Content-Type':'application/json' },
+        ...opts,
+        body: opts.body && typeof opts.body !== 'string' ? JSON.stringify(opts.body) : opts.body
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    function formatINR(n){ return Number(n||0).toLocaleString('en-IN',{ maximumFractionDigits:0 }); }
+
+    async function ensureUser(){
+      const username = getUsername();
+      const user = await apiFetch('/api/user', { method:'POST', body:{ username } });
+      return user.id;
+    }
+
+    function renderWeeklyBars(daily){
+      const wrap = document.getElementById('weeklyBars');
+      wrap.innerHTML = '';
+      const vals = Object.values(daily);
+      const max = Math.max(1, ...vals);
+      const order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      order.forEach(key => {
+        const total = Number(daily[key]||0);
+        const h = Math.max(4, Math.round(total / max * 160));
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = h + 'px';
+        bar.innerHTML = `<small>₹${formatINR(total)}</small>`;
+        const label = document.createElement('label');
+        label.textContent = key;
+        bar.appendChild(label);
+        wrap.appendChild(bar);
+      });
+      const empty = vals.every(v => v === 0);
+      document.getElementById('weeklyEmpty').style.display = empty ? 'block' : 'none';
+    }
+
+    function startOfWeekISO(date){
+      const d = new Date(date);
+      const day = d.getDay(); // 0 Sun .. 6 Sat
+      const diff = (day === 0 ? -6 : 1) - day; // Monday as start
+      d.setDate(d.getDate() + diff);
+      d.setHours(0,0,0,0);
+      return d.toISOString().slice(0,10);
+    }
+
+    function renderCategoryTable(categories, txns){
+      const byCat = Object.fromEntries(categories.map(c => [c.name, { budget:Number(c.budget)||0, spent:0 }]));
+      const thisWeekStart = startOfWeekISO(new Date());
+      txns.forEach(t => {
+        if(t.date >= thisWeekStart){ const key = t.category || 'Other'; if(byCat[key]) byCat[key].spent += Number(t.amount)||0; }
+      });
+      const tbody = document.getElementById('catTbody');
+      tbody.innerHTML = '';
+      Object.entries(byCat).forEach(([name, v]) => {
+        const tr = document.createElement('tr');
+        const usage = v.budget ? Math.min(100, Math.round(v.spent / v.budget * 100)) : 0;
+        tr.innerHTML = `<td>${name}</td><td>₹${formatINR(v.budget)}</td><td>₹${formatINR(v.spent)}</td><td>${usage}%</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderRecentTxns(txns){
+      const tbody = document.getElementById('txTbody');
+      tbody.innerHTML = '';
+      const thisWeekStart = startOfWeekISO(new Date());
+      txns
+        .filter(t => t.date >= thisWeekStart)
+        .sort((a,b) => (a.date < b.date ? 1 : -1))
+        .slice(0, 20)
+        .forEach(t => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${t.date}</td><td>${t.description || ''}</td><td>${t.category || ''}</td><td>₹${formatINR(t.amount)}</td>`;
+          tbody.appendChild(tr);
+        });
+    }
+
+    async function init(){
+      try{
+        const userId = await ensureUser();
+        const [cats, txns] = await Promise.all([
+          apiFetch(`/api/user/${userId}/categories`),
+          apiFetch(`/api/user/${userId}/transactions`)
+        ]);
+
+        // Build daily totals for current week (Mon..Sun)
+        const thisWeekStart = new Date(startOfWeekISO(new Date()));
+        const toISO = d => new Date(d).toISOString().slice(0,10);
+        const dayKey = d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()];
+        const daily = { Mon:0, Tue:0, Wed:0, Thu:0, Fri:0, Sat:0, Sun:0 };
+        const weekEnd = new Date(thisWeekStart); weekEnd.setDate(weekEnd.getDate()+6);
+        txns
+          .filter(t => t.date >= toISO(thisWeekStart) && t.date <= toISO(weekEnd))
+          .forEach(t => { const k = dayKey(t.date); if(daily[k] !== undefined){ daily[k] += Number(t.amount)||0; } });
+
+        renderWeeklyBars(daily);
+        renderCategoryTable(cats, txns);
+        renderRecentTxns(txns);
+      }catch(e){
+        console.warn('Analytics load failed:', e.message);
+        document.getElementById('weeklyEmpty').textContent = 'Cannot reach backend on ' + (API_BASE || location.origin) + '. Ensure the server is running.';
+        document.getElementById('weeklyEmpty').style.display = 'block';
+      }
+    }
+
+    // Live updates: refresh every 2 seconds and when tab becomes visible
+    function startLive(){
+      init();
+      setInterval(init, 2000);
+      document.addEventListener('visibilitychange', () => { if(!document.hidden) init(); });
+    }
+
+    startLive();
+  </script>
+</body>
+</html>
