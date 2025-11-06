@@ -15,7 +15,7 @@ app.use(express.static('public')); // Serve frontend files if present
 // MySQL config and pool (initialized in init)
 const MYSQL_HOST = 'localhost';
 const MYSQL_USER = 'root';
-const MYSQL_PASSWORD = 'anitha2302';
+const MYSQL_PASSWORD = 'Lakshay@133';
 const MYSQL_DATABASE = 'budget_tracker';
 
 let pool; // assigned after ensuring database exists
@@ -26,8 +26,8 @@ async function initDB() {
     // Ensure database exists first
     const bootstrap = await mysql.createConnection({
       host: MYSQL_HOST,
-      user: root,
-      password: anitha2302
+      user: MYSQL_USER,
+      password: MYSQL_PASSWORD
     });
     await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\``);
     await bootstrap.end();
@@ -89,9 +89,19 @@ async function initDB() {
 
 // Routes
 
+// Middleware to check if database is connected
+function checkDatabase(req, res, next) {
+  if (!pool) {
+    return res.status(503).json({ 
+      error: 'Database not connected. Please check MySQL is running and credentials are correct.' 
+    });
+  }
+  next();
+}
+
 // Lightweight health check (does not touch DB)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', database: pool ? 'connected' : 'disconnected' });
 });
 
 // Serve the HTML from project root if no public/ dir
@@ -105,7 +115,7 @@ app.get('/analytics', (req, res) => {
 });
 
 // Get or create user
-app.post('/api/user', async (req, res) => {
+app.post('/api/user', checkDatabase, async (req, res) => {
   try {
     const { username } = req.body;
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
@@ -140,7 +150,7 @@ app.post('/api/user', async (req, res) => {
 });
 
 // Update income
-app.put('/api/user/:userId/income', async (req, res) => {
+app.put('/api/user/:userId/income', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     const { income } = req.body;
@@ -152,7 +162,7 @@ app.put('/api/user/:userId/income', async (req, res) => {
 });
 
 // Get categories
-app.get('/api/user/:userId/categories', async (req, res) => {
+app.get('/api/user/:userId/categories', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     const [rows] = await pool.query('SELECT * FROM categories WHERE user_id = ?', [userId]);
@@ -163,7 +173,7 @@ app.get('/api/user/:userId/categories', async (req, res) => {
 });
 
 // Update category budget
-app.put('/api/category/:id', async (req, res) => {
+app.put('/api/category/:id', checkDatabase, async (req, res) => {
   try {
     const { id } = req.params;
     const { budget } = req.body;
@@ -175,7 +185,7 @@ app.put('/api/category/:id', async (req, res) => {
 });
 
 // Get all transactions
-app.get('/api/user/:userId/transactions', async (req, res) => {
+app.get('/api/user/:userId/transactions', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     const [rows] = await pool.query(
@@ -189,7 +199,7 @@ app.get('/api/user/:userId/transactions', async (req, res) => {
 });
 
 // Add transaction
-app.post('/api/user/:userId/transactions', async (req, res) => {
+app.post('/api/user/:userId/transactions', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     const { date, description, category, amount } = req.body;
@@ -205,7 +215,7 @@ app.post('/api/user/:userId/transactions', async (req, res) => {
 });
 
 // Update transaction
-app.put('/api/transaction/:id', async (req, res) => {
+app.put('/api/transaction/:id', checkDatabase, async (req, res) => {
   try {
     const { id } = req.params;
     const { date, description, category, amount } = req.body;
@@ -220,7 +230,7 @@ app.put('/api/transaction/:id', async (req, res) => {
 });
 
 // Delete transaction
-app.delete('/api/transaction/:id', async (req, res) => {
+app.delete('/api/transaction/:id', checkDatabase, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM transactions WHERE id = ?', [id]);
@@ -231,7 +241,7 @@ app.delete('/api/transaction/:id', async (req, res) => {
 });
 
 // Get weekly expenses
-app.get('/api/user/:userId/weekly-expenses', async (req, res) => {
+app.get('/api/user/:userId/weekly-expenses', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     const [rows] = await pool.query(`
@@ -252,7 +262,7 @@ app.get('/api/user/:userId/weekly-expenses', async (req, res) => {
 });
 
 // Reset user data
-app.delete('/api/user/:userId/reset', async (req, res) => {
+app.delete('/api/user/:userId/reset', checkDatabase, async (req, res) => {
   try {
     const { userId } = req.params;
     await pool.query('DELETE FROM transactions WHERE user_id = ?', [userId]);
