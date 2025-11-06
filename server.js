@@ -15,7 +15,7 @@ app.use(express.static('public')); // Serve frontend files if present
 // MySQL config and pool (initialized in init)
 const MYSQL_HOST = 'localhost';
 const MYSQL_USER = 'root';
-const MYSQL_PASSWORD = 'Lakshay@133';
+const MYSQL_PASSWORD = 'MY_SQL_PASSWORD';
 const MYSQL_DATABASE = 'budget_tracker';
 
 let pool; // assigned after ensuring database exists
