@@ -4,13 +4,13 @@ A full-stack budget tracking application built with Node.js, Express, and MySQL.
 
 ## Features
 
-- 💰 **Income Management**: Set and track your monthly income
-- 📊 **Category Budgets**: Manage weekly budgets for different spending categories
-- 💳 **Transaction Tracking**: Add, edit, and delete expenses with date, description, category, and amount
-- 📈 **Analytics Dashboard**: View daily spending charts, category breakdowns, and recent transactions
-- 💾 **MySQL Backend**: All data is stored in MySQL database with automatic table creation
-- 🔄 **Real-time Updates**: Analytics page auto-refreshes every 2 seconds
-- 🎨 **Modern UI**: Clean, dark-themed interface with responsive design
+- **Income Management**: Set and track your monthly income
+- **Category Budgets**: Manage weekly budgets for different spending categories
+- **Transaction Tracking**: Add, edit, and delete expenses with date, description, category, and amount
+- **Analytics Dashboard**: View daily spending charts, category breakdowns, and recent transactions
+- **MySQL Backend**: All data is stored in MySQL database with automatic table creation
+- **Real-time Updates**: Analytics page auto-refreshes every 2 seconds
+- **Modern UI**: Clean, dark-themed interface with responsive design
 
 ## Prerequisites
 
